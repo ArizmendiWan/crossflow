@@ -67,6 +67,18 @@ function BaseNode({
                 `0 0 8px 3px ${alpha(theme.palette.info.main, 0.35)}`,
               ].join(', ')
             : undefined,
+        animation: interactionVisited
+          ? 'interaction-finished 450ms ease-out'
+          : undefined,
+        '@keyframes interaction-finished': {
+          from: {
+            outlineColor: theme.palette.success.main,
+            boxShadow: [
+              `0 0 0 4px ${alpha(theme.palette.success.main, 0.28)}`,
+              `0 0 18px 6px ${alpha(theme.palette.success.main, 0.35)}`,
+            ].join(', '),
+          },
+        },
         transition: theme.transitions.create(['box-shadow', 'outline-color'], {
           duration: theme.transitions.duration.shortest,
         }),

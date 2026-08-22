@@ -1058,13 +1058,18 @@ fn append_interaction_feedback(
 }
 
 #[cfg(feature = "router")]
+fn interaction_operation_id(info: Option<&crossflow::OperationInfo>) -> Option<String> {
+    info?.id().as_ref().map(ToString::to_string)
+}
+
+#[cfg(feature = "router")]
 fn operation_lifecycle_feedback(feedback: &TracedEvent) -> Option<InteractionSessionFeedback> {
     let (operation, started) = match &feedback.event {
         TracedEventKind::OperationStarted(event) => (&event.operation, true),
         TracedEventKind::OperationFinished(event) => (&event.operation, false),
         _ => return None,
     };
-    let operation_id = operation.info.as_ref()?.id().as_ref()?.to_string();
+    let operation_id = interaction_operation_id(operation.info.as_deref())?;
     let session = operation
         .session_stack
         .last()
@@ -1089,12 +1094,7 @@ fn operation_lifecycle_feedback(feedback: &TracedEvent) -> Option<InteractionSes
 fn connection_activity_feedback(feedback: &TracedEvent) -> Vec<InteractionSessionFeedback> {
     match &feedback.event {
         TracedEventKind::MessageSent(message) => {
-            let Some(target_operation_id) = message
-                .input
-                .info
-                .as_ref()
-                .and_then(|info| info.id().as_ref())
-                .map(ToString::to_string)
+            let Some(target_operation_id) = interaction_operation_id(message.input.info.as_deref())
             else {
                 return Vec::new();
             };
@@ -1102,11 +1102,7 @@ fn connection_activity_feedback(feedback: &TracedEvent) -> Vec<InteractionSessio
                 .output
                 .iter()
                 .filter_map(|source| {
-                    let source_operation_id = source
-                        .info
-                        .as_ref()
-                        .and_then(|info| info.id().as_ref())
-                        .map(ToString::to_string)?;
+                    let source_operation_id = interaction_operation_id(source.info.as_deref())?;
                     Some(InteractionSessionFeedback::ConnectionActivity {
                         source_operation_id,
                         target_operation_id: target_operation_id.clone(),
@@ -1115,21 +1111,12 @@ fn connection_activity_feedback(feedback: &TracedEvent) -> Vec<InteractionSessio
                 .collect()
         }
         TracedEventKind::BufferEvent(event) => {
-            let Some(source_operation_id) = event
-                .buffer
-                .info
-                .as_ref()
-                .and_then(|info| info.id().as_ref())
-                .map(ToString::to_string)
+            let Some(source_operation_id) = interaction_operation_id(event.buffer.info.as_deref())
             else {
                 return Vec::new();
             };
-            let Some(target_operation_id) = event
-                .accessor
-                .info
-                .as_ref()
-                .and_then(|info| info.id().as_ref())
-                .map(ToString::to_string)
+            let Some(target_operation_id) =
+                interaction_operation_id(event.accessor.info.as_deref())
             else {
                 return Vec::new();
             };
