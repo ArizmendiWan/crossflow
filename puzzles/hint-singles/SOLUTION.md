@@ -39,7 +39,7 @@ before* ← **a band**.
 | 3 | Un Verano Sin Cabello | Un Verano Sin Ti | Bad Bunny → Ba**l**d Bunny | L |
 | 4 | Party Off the Coast of Greece | Party in the U.S.A. | Miley Cyrus → Miley Cy**p**rus | P |
 | 5 | Where the Cheddar Cheese Pretzel Things Are | Where the Wild Things Are | Luke Combs → Luke Comb**o**s | O |
-| 6 | Elevated (Onto a Plinth) | ? | ? | U |
+| 6 | Elevated (Onto a Plinth) | Elevated | State Champs → Stat**u**e Champs | U |
 | 7 | Hurt (In a Fender Bender) | Hurt | Johnny Cash → Johnny C**r**ash | R |
 | 8 | Learn to (Throw a) Pie | Learn to Fly | Foo Fighters → Foo**d** Fighters | D |
 | 9 | Only the Good Die on Planet Krypton | Only the Good Die Young | Billy Joel → Billy Jo**r**-El | R |
@@ -66,9 +66,8 @@ H E L P O U R D R U M M E R I S O U T S I C K
         HELP OUR DRUMMER IS OUT SICK
 ```
 
-21 of the 23 were identified independently of the message, and all 21 agree
-with it, which pins the two unsolved clues (#2 = E, #6 = U, #14 = R) even
-without cracking them.
+22 of the 23 were identified independently of the message, and all 22 agree
+with it, which pins the last clue (#14 = R) even without cracking it.
 
 ## The answer
 
@@ -95,9 +94,17 @@ with a single letter inserted.
 
 ## Loose ends
 
-Two clues I did not crack; their letters are fixed by the message:
+One clue I did not crack; its letter is fixed by the message:
 
-- **#6 "Elevated (Onto a Plinth)"** → artist + **U**
-- **#14 "Wake Me Up To Drive (This Boat I Stole)"** → artist + **R**
+- **#14 "Wake Me Up To Drive (This Boat I Stole)"** → artist + **R**.
+  No artist with a "Wake Me Up" song (Avicii, Girls Aloud, Ed Sheeran, Aloe
+  Blacc, Foals, Twice, Simple Plan, Billy Currington, Remy Ma, Speed, Taeyang,
+  B.A.P, The Weeknd & Justice) takes an R insertion, nor does Wham!
+  ("Wake Me Up Before You Go-Go") or Green Day ("…When September Ends"), so
+  the base song is probably one I haven't identified.
+
+Also unresolved: the joke in **#2 "A Little MISS Can't Be Wrong"**. The letter
+is E and Spin Doctors → Spin**e** Doctors is the only sensible insertion, but
+how "a little MISS" clues a spine specialist is still opaque to me.
 
 `tracks.py` reproduces the extraction and checks it against the message.
