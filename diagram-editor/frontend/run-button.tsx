@@ -18,7 +18,11 @@ import { useNodeManager } from './node-manager';
 import { MaterialSymbol } from './nodes';
 import { useRegistry } from './registry-provider';
 import { useTemplates } from './templates-provider';
-import type { Diagram, DiagramOperation } from './types/api';
+import type {
+  Diagram,
+  DiagramOperation,
+  InteractionSessionFeedback,
+} from './types/api';
 import { useEdges } from './use-edges';
 import { exportDiagram } from './utils/export-diagram';
 
@@ -32,6 +36,7 @@ interface ExecutionTimelineEntry {
 
 const DefaultResponseContent: ResponseContent = { raw: '' };
 const MaxExecutionTimelineEntries = 200;
+const MaxInteractionPlaybackFrames = 60;
 
 function enableInteractionTraceForOps(ops: Record<string, DiagramOperation>) {
   for (const op of Object.values(ops)) {
@@ -68,6 +73,7 @@ export function RunPanel({
   const {
     clearInteractionVisualization,
     markInteractionFinished,
+    markInteractionConnection,
     markInteractionOperationFinished,
     markInteractionOperationStarted,
   } = useInteractionVisualization();
@@ -84,6 +90,9 @@ export function RunPanel({
     ReturnType<NonNullable<typeof apiClient.wsInteractWithWorkflow>>
   > | null>(null);
   const interactionSubscriptionRef = useRef<Subscription | null>(null);
+  const interactionPlaybackQueue = useRef<InteractionSessionFeedback[]>([]);
+  const interactionPlaybackFrame = useRef<number | null>(null);
+  const interactionFinishPending = useRef(false);
   const [diagramProperties] = useDiagramProperties();
 
   const closeInteractionSession = useCallback(() => {
@@ -93,17 +102,70 @@ export function RunPanel({
     interactionSessionRef.current = null;
   }, []);
 
+  const clearInteractionPlayback = useCallback(() => {
+    if (interactionPlaybackFrame.current !== null) {
+      cancelAnimationFrame(interactionPlaybackFrame.current);
+    }
+    interactionPlaybackFrame.current = null;
+    interactionPlaybackQueue.current.length = 0;
+    interactionFinishPending.current = false;
+  }, []);
+
+  const playInteractionEvents = useCallback(
+    function play() {
+      const queue = interactionPlaybackQueue.current;
+      const events = queue.splice(
+        0,
+        Math.max(1, Math.ceil(queue.length / MaxInteractionPlaybackFrames)),
+      );
+
+      for (const event of events) {
+        if ('operationStarted' in event) {
+          const { operationId, executionId } = event.operationStarted;
+          markInteractionOperationStarted(operationId, executionId);
+        } else if ('operationFinished' in event) {
+          const { operationId, executionId } = event.operationFinished;
+          markInteractionOperationFinished(operationId, executionId);
+        } else if ('connectionActivity' in event) {
+          const { sourceOperationId, targetOperationId } =
+            event.connectionActivity;
+          markInteractionConnection(sourceOperationId, targetOperationId);
+        }
+      }
+
+      if (queue.length > 0) {
+        interactionPlaybackFrame.current = requestAnimationFrame(play);
+      } else {
+        interactionPlaybackFrame.current = null;
+        if (interactionFinishPending.current) {
+          interactionFinishPending.current = false;
+          markInteractionFinished();
+        }
+      }
+    },
+    [
+      markInteractionConnection,
+      markInteractionFinished,
+      markInteractionOperationFinished,
+      markInteractionOperationStarted,
+    ],
+  );
+
   useEffect(() => {
-    return closeInteractionSession;
-  }, [closeInteractionSession]);
+    return () => {
+      clearInteractionPlayback();
+      closeInteractionSession();
+    };
+  }, [clearInteractionPlayback, closeInteractionSession]);
 
   useEffect(() => {
     showProgressRef.current = showProgress;
     if (!showProgress) {
+      clearInteractionPlayback();
       clearInteractionVisualization();
       setExecutionTimeline([]);
     }
-  }, [clearInteractionVisualization, showProgress]);
+  }, [clearInteractionPlayback, clearInteractionVisualization, showProgress]);
 
   const requestError = useMemo(() => {
     try {
@@ -143,6 +205,7 @@ export function RunPanel({
   };
 
   const handleRunClick = async () => {
+    clearInteractionPlayback();
     closeInteractionSession();
     clearInteractionVisualization();
     setExecutionTimeline([]);
@@ -173,40 +236,40 @@ export function RunPanel({
       interactionSubscriptionRef.current =
         interactionSession.interactionMessages$.subscribe({
           next: (msg) => {
-            if (
-              msg.type === 'feedback' &&
-              'operationStarted' in msg &&
-              typeof msg.operationStarted === 'string'
-            ) {
+            if (msg.type === 'feedback') {
               if (!showProgressRef.current) {
                 return;
               }
-              const operationId = msg.operationStarted;
-              markInteractionOperationStarted(operationId);
-              const entry = {
-                seq: ++interactionEventCounter.current,
-                operationId,
-              };
-              setExecutionTimeline((prev) =>
-                [...prev, entry].slice(-MaxExecutionTimelineEntries),
-              );
-              return;
-            }
-
-            if (
-              msg.type === 'feedback' &&
-              'operationFinished' in msg &&
-              typeof msg.operationFinished === 'string'
-            ) {
-              if (!showProgressRef.current) {
-                return;
+              const entries: ExecutionTimelineEntry[] = [];
+              for (const event of msg.events) {
+                if ('operationStarted' in event) {
+                  const { operationId } = event.operationStarted;
+                  entries.push({
+                    seq: ++interactionEventCounter.current,
+                    operationId,
+                  });
+                }
               }
-              markInteractionOperationFinished(msg.operationFinished);
+              if (entries.length > 0) {
+                setExecutionTimeline((prev) =>
+                  [...prev, ...entries].slice(-MaxExecutionTimelineEntries),
+                );
+              }
+              interactionPlaybackQueue.current.push(...msg.events);
+              if (interactionPlaybackFrame.current === null) {
+                interactionPlaybackFrame.current = requestAnimationFrame(
+                  playInteractionEvents,
+                );
+              }
               return;
             }
 
             if (msg.type === 'finish') {
-              markInteractionFinished();
+              if (interactionPlaybackFrame.current !== null) {
+                interactionFinishPending.current = true;
+              } else {
+                markInteractionFinished();
+              }
               if ('ok' in msg) {
                 setResponseContent({ raw: JSON.stringify(msg.ok, null, 2) });
               } else {
@@ -217,6 +280,7 @@ export function RunPanel({
             }
           },
           error: (err) => {
+            clearInteractionPlayback();
             markInteractionFinished();
             setResponseContent({ err: (err as Error).message });
             setRunningMode(null);

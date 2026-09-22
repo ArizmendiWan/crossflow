@@ -66,6 +66,7 @@ import { EditEdgeForm, EditNodeForm } from './forms';
 import EditScopeForm from './forms/edit-scope-form';
 import type { ScriptNodeEnvironmentBinding } from './forms/script-environment-workspace';
 import { useScriptEnvironmentNavigation } from './forms/use-script-environment-navigation';
+import { glowEdge } from './handles';
 import {
   type InteractionVisualizationContext,
   InteractionVisualizationProvider,
@@ -82,6 +83,7 @@ import {
   MaterialSymbol,
   NODE_TYPES,
   type OperationNode,
+  START_ID,
   TERMINATE_ID,
 } from './nodes';
 import { NotificationProvider } from './notification-provider';
@@ -248,6 +250,22 @@ function getInteractionNodeId(
     ? operationId.slice(1)
     : operationId;
 
+  if (normalizedId === '(start)') {
+    return (
+      nodeManager.tryGetNode(joinNamespaces(ROOT_NAMESPACE, START_ID))?.id ??
+      null
+    );
+  }
+
+  if (normalizedId.endsWith(':(start)')) {
+    const namespace = normalizedId.slice(0, -':(start)'.length);
+    return (
+      nodeManager.tryGetNode(
+        joinNamespaces(ROOT_NAMESPACE, namespace, START_ID),
+      )?.id ?? null
+    );
+  }
+
   if (normalizedId === '(terminate)') {
     return (
       nodeManager.tryGetNode(joinNamespaces(ROOT_NAMESPACE, TERMINATE_ID))
@@ -303,21 +321,32 @@ function DiagramEditor() {
     React.useState(() => new Set<string>());
   const [interactionVisitedNodeIds, setInteractionVisitedNodeIds] =
     React.useState(() => new Set<string>());
+  const interactionExecutionNodeIds = React.useRef(new Map<string, string>());
   const clearInteractionVisualization = React.useCallback(() => {
+    interactionExecutionNodeIds.current.clear();
     setInteractionActiveNodeIds(new Set());
     setInteractionVisitedNodeIds(new Set());
   }, []);
   const markInteractionFinished = React.useCallback(() => {
+    interactionExecutionNodeIds.current.clear();
     setInteractionActiveNodeIds(new Set());
   }, []);
   const markInteractionOperationFinished = React.useCallback(
-    (operationId: string) => {
-      const nodeId = getInteractionNodeId(operationId, nodeManager);
+    (operationId: string, executionId: string) => {
+      const nodeId =
+        interactionExecutionNodeIds.current.get(executionId) ??
+        getInteractionNodeId(operationId, nodeManager);
       if (!nodeId) {
         return;
       }
 
+      interactionExecutionNodeIds.current.delete(executionId);
       setInteractionActiveNodeIds((prev) => {
+        if (
+          [...interactionExecutionNodeIds.current.values()].includes(nodeId)
+        ) {
+          return prev;
+        }
         const next = new Set(prev);
         next.delete(nodeId);
         return next;
@@ -331,12 +360,13 @@ function DiagramEditor() {
     [nodeManager],
   );
   const markInteractionOperationStarted = React.useCallback(
-    (operationId: string) => {
+    (operationId: string, executionId: string) => {
       const nodeId = getInteractionNodeId(operationId, nodeManager);
       if (!nodeId) {
         return;
       }
 
+      interactionExecutionNodeIds.current.set(executionId, nodeId);
       setInteractionVisitedNodeIds((prev) => {
         const next = new Set(prev);
         next.delete(nodeId);
@@ -350,6 +380,23 @@ function DiagramEditor() {
     },
     [nodeManager],
   );
+  const markInteractionConnection = React.useCallback(
+    (sourceOperationId: string, targetOperationId: string) => {
+      const sourceNodeId = getInteractionNodeId(sourceOperationId, nodeManager);
+      const targetNodeId = getInteractionNodeId(targetOperationId, nodeManager);
+      if (!sourceNodeId || !targetNodeId) {
+        return;
+      }
+      reactFlowInstance.current
+        ?.getEdges()
+        .filter(
+          (edge) =>
+            edge.source === sourceNodeId && edge.target === targetNodeId,
+        )
+        .forEach((edge) => glowEdge(edge.id));
+    },
+    [nodeManager],
+  );
   const interactionVisualizationContext =
     React.useMemo<InteractionVisualizationContext>(
       () => ({
@@ -359,6 +406,7 @@ function DiagramEditor() {
         markInteractionFinished,
         markInteractionOperationFinished,
         markInteractionOperationStarted,
+        markInteractionConnection,
       }),
       [
         clearInteractionVisualization,
@@ -367,6 +415,7 @@ function DiagramEditor() {
         markInteractionFinished,
         markInteractionOperationFinished,
         markInteractionOperationStarted,
+        markInteractionConnection,
       ],
     );
   const savedNodes = React.useRef<DiagramEditorNode[]>([]);
