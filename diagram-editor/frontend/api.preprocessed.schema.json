@@ -849,102 +849,49 @@
         }
       ]
     },
-    "InteractionSessionFeedback": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "operationStarted": {
-              "properties": {
-                "executionId": {
-                  "type": "string"
-                },
-                "operationId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "operationId",
-                "executionId"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "operationStarted"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "operationFinished": {
-              "properties": {
-                "executionId": {
-                  "type": "string"
-                },
-                "operationId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "operationId",
-                "executionId"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "operationFinished"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "connectionActivity": {
-              "properties": {
-                "sourceOperationId": {
-                  "type": "string"
-                },
-                "targetOperationId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "sourceOperationId",
-                "targetOperationId"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "connectionActivity"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "InteractionSessionMessage": {
       "oneOf": [
         {
-          "properties": {
-            "events": {
-              "items": {
-                "$ref": "#/$defs/InteractionSessionFeedback"
-              },
-              "type": "array"
+          "allOf": [
+            {
+              "oneOf": [
+                {
+                  "properties": {
+                    "operationStarted": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "operationStarted"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "operationFinished": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "operationFinished"
+                  ],
+                  "type": "object"
+                }
+              ]
             },
-            "type": {
-              "const": "feedback",
-              "type": "string"
+            {
+              "properties": {
+                "type": {
+                  "const": "feedback",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object"
             }
-          },
-          "required": [
-            "type",
-            "events"
-          ],
-          "type": "object"
+          ]
         },
         {
           "allOf": [

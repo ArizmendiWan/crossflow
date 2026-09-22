@@ -21,7 +21,7 @@ use std::borrow::Cow;
 
 use super::{
     BufferSelection, BuildDiagramOperation, BuildStatus, BuilderContext, DiagramErrorCode,
-    JsonMessage, NextOperation, OperationName, TraceInfo,
+    JsonMessage, NextOperation, OperationName,
 };
 use crate::{
     BufferMap, BufferMapLayout, BufferMapLayoutHints, Builder, DynOutput, IdentifierRef,
@@ -133,21 +133,18 @@ impl BuildDiagramOperation for JoinSchema {
             })?;
         }
 
-        let output: DynOutput = if self.serialize {
-            ctx.builder
-                .try_join::<JsonMessage>(&buffer_map)?
-                .output()
-                .into()
+        if self.serialize {
+            let output = ctx.builder.try_join::<JsonMessage>(&buffer_map)?.output();
+            ctx.add_output_into_target(&self.next, output.into());
         } else {
             let target_type = ctx.inferred_message_type(output_ref(id).next())?;
 
-            ctx.registry
+            let output = ctx
+                .registry
                 .messages
-                .join(&target_type, &buffer_map, ctx.builder)?
-        };
-        let trace = TraceInfo::new(self, self.trace_settings.trace)?;
-        ctx.trace_output_source(id, &output, trace);
-        ctx.add_output_into_target(&self.next, output);
+                .join(&target_type, &buffer_map, ctx.builder)?;
+            ctx.add_output_into_target(&self.next, output);
+        }
         Ok(BuildStatus::Finished)
     }
 
